@@ -4,11 +4,13 @@ import com.utsav.bookmarker_api.domain.Bookmark;
 import com.utsav.bookmarker_api.domain.BookmarkRepository;
 import org.hamcrest.CoreMatchers;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -16,7 +18,12 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.notNullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -76,5 +83,44 @@ class BookmarkControllerTest {
                 .andExpect(jsonPath("$.hasNext", CoreMatchers.equalTo(hasNext)))
                 .andExpect(jsonPath("$.hasPrevious", CoreMatchers.equalTo(hasPrevious)))
         ;
+    }
+
+    @Test
+    void shouldCreateBookmarkSuccessfully() throws Exception {
+        this.mvc.perform(
+                        post("/api/bookmarks")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+            {
+                "title": "Utsav LinkedIn",
+                "url": "https://www.linkedin.com/in/utsav-rawat/"
+            }
+            """)
+                )
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id", notNullValue()))
+                .andExpect(jsonPath("$.title", is("Utsav LinkedIn")))
+                .andExpect(jsonPath("$.url", is("https://www.linkedin.com/in/utsav-rawat/")));
+    }
+    @Test
+    void shouldFailToCreateBookmarkWhenUrlIsNotPresent() throws Exception {
+        this.mvc.perform(
+                        post("/api/bookmarks")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                {
+                    "title": "Utsav LinkedIn"
+                }
+                """)s
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(header().string("Content-Type", is("application/problem+json")))
+                .andExpect(jsonPath("$.type", is("https://zalando.github.io/problem/constraint-violation")))
+                .andExpect(jsonPath("$.title", is("Constraint Violation")))
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.violations", hasSize(1)))
+                .andExpect(jsonPath("$.violations[0].field", is("url")))
+                .andExpect(jsonPath("$.violations[0].message", is("Url should not be empty")))
+                .andReturn();
     }
 }
